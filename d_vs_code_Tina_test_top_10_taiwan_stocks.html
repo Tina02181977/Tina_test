@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣股價前十名連結</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 700px;
+            text-align: center;
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .button-container {
+            margin-bottom: 25px;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        button:hover {
+            background-color: #155ab6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        #status {
+            margin-top: 15px;
+            font-style: italic;
+            color: #666;
+            height: 20px;
+        }
+        #stock-list {
+            list-style-type: none;
+            padding: 0;
+            text-align: left;
+        }
+        #stock-list li {
+            background-color: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        #stock-list li:hover {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+        }
+        #stock-list a {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+        }
+        .stock-name {
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .stock-price {
+            font-weight: bold;
+            color: #28a745;
+            min-width: 80px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>台灣股市股價前十名</h1>
+        <div class="button-container">
+            <button id="fetch-btn">抓取最新資料</button>
+        </div>
+        <div id="status">準備就緒</div>
+        <ul id="stock-list"></ul>
+    </div>
+
+    <script>
+        const fetchBtn = document.getElementById('fetch-btn');
+        const stockList = document.getElementById('stock-list');
+        const statusLabel = document.getElementById('status');
+
+        fetchBtn.addEventListener('click', fetchTopStocks);
+
+        async function fetchTopStocks() {
+            statusLabel.textContent = '正在從 Yahoo 股市抓取資料...';
+            stockList.innerHTML = '';
+
+            // 注意：由於瀏覽器的 CORS 安全策略，前端直接抓取跨網域的網頁可能會被阻擋。
+            // 這裡使用 allorigins.win 作為代理來繞過此限制，僅適用於開發或個人專案。
+            const url = 'https://tw.stock.yahoo.com/rank/price';
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+
+            try {
+                const response = await fetch(proxyUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                if (!response.ok) throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
+                
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const items = doc.querySelectorAll('li.List\\(n\\)');
+                if (items.length === 0) throw new Error('無法解析網站內容，結構可能已變更。');
+
+                let stocks = [];
+                items.forEach(item => {
+                    if (stocks.length >= 10) return;
+                    
+                    const name = item.querySelector('div.Lh\\(20px\\)')?.textContent.trim();
+                    const symbol = item.querySelector('span.Fz\\(12px\\)')?.textContent.trim();
+                    const price = item.querySelectorAll('div.Fxg\\(1\\) > span')[0]?.textContent.trim();
+
+                    if (name && symbol && price) {
+                        stocks.push({ name, symbol, price, url: `https://tw.stock.yahoo.com/quote/${symbol}` });
+                    }
+                });
+
+                displayStocks(stocks);
+                statusLabel.textContent = `成功抓取 ${stocks.length} 筆資料！`;
+
+            } catch (error) {
+                console.error('抓取失敗:', error);
+                statusLabel.textContent = `抓取即時資料失敗: ${error.message} 將載入範例資料。`;
+                // 如果抓取失敗，載入範例資料
+                const sampleStocks = [
+                    { name: '大立光', symbol: '3008', price: '2,250', url: 'https://tw.stock.yahoo.com/quote/3008' },
+                    { name: '信驊', symbol: '5274', price: '2,100', url: 'https://tw.stock.yahoo.com/quote/5274' },
+                    { name: '祥碩', symbol: '5269', price: '1,500', url: 'https://tw.stock.yahoo.com/quote/5269' },
+                ];
+                displayStocks(sampleStocks);
+            }
+        }
+
+        function displayStocks(stocks) {
+            stocks.forEach(stock => {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `<a href="${stock.url}" target="_blank"><span class="stock-name">${stock.symbol} ${stock.name}</span><span class="stock-price">${stock.price}</span></a>`;
+                stockList.appendChild(listItem);
+            });
+        }
+    </script>
+
+</body>
+</html>
